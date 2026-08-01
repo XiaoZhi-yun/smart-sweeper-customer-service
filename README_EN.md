@@ -54,6 +54,35 @@ graph TD
     I --> B
 ```
 
+## Screenshots
+
+| Chat | Weather & Cleaning Tips | Usage Report |
+| --- | --- | --- |
+| ![Chat](assets/screenshot-1.png) | ![Weather & Cleaning Tips](assets/screenshot-2.png) | ![Usage Report](assets/screenshot-3.png) |
+
+### Request Lifecycle
+
+```mermaid
+graph TD
+    A["User enters a question in the browser"] --> B["app.py builds messages and checks report intent"]
+    B --> C["ReactAgent.execute_stream"]
+    C --> D{"More than 12 history messages?"}
+    D -->|Yes| E["LLM summarizes old messages"]
+    D -->|No| F["LangGraph enters the ReAct loop"]
+    E --> F
+    F --> G["before_model middleware<br/>logging / token stats / prompt switch"]
+    G --> H["Model reasons: call a tool or answer directly"]
+    H --> I{"Tool call needed?"}
+    I -->|Yes| J["wrap_tool_call middleware + tool execution"]
+    J --> K["RAG retrieval / weather / user data tools"]
+    K --> G
+    I -->|No| L["Stream final answer"]
+    L --> M["app.py renders typewriter output"]
+    M --> N["Save to session history and refresh"]
+```
+
+The full flow is described in [Project Retrospective](./项目复盘.md), Chapter 4, "The Complete Lifecycle of a Request".
+
 ## Project Structure
 
 ```text
@@ -260,3 +289,9 @@ I first tried hardcoding rules such as "switch to report mode when the input con
 - [Project Retrospective](./项目复盘.md) - Full project retrospective
 - [Interview Q&A Guide](./项目面试预测.md) - Interview Q&A prediction guide
 - [Deployment Guide](./项目运行.txt) - Deployment and run guide
+
+## Acknowledgments & References
+
+This project was organized and implemented for learning purposes after studying 【黑马程序员大模型RAG与Agent智能体项目实战教程】(Heima Programmer: LLM RAG & Agent project tutorial, based on mainstream LangChain technology). Thanks to Heima Programmer for the excellent course.
+
+Video link: [Heima Programmer LLM RAG & Agent tutorial](https://www.bilibili.com/video/BV1yjz5BLEoY?vd_source=e75d4bd4c7aa7b9e61694ea13cda1272)

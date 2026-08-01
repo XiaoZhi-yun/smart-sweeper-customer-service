@@ -54,6 +54,35 @@ graph TD
     I --> B
 ```
 
+## 界面展示
+
+| 智能对话 | 天气与清洁建议 | 使用报告生成 |
+| --- | --- | --- |
+| ![智能对话](assets/screenshot-1.png) | ![天气与清洁建议](assets/screenshot-2.png) | ![使用报告生成](assets/screenshot-3.png) |
+
+### 请求执行流程
+
+```mermaid
+graph TD
+    A["用户在浏览器输入问题"] --> B["app.py 组装消息并检测报告意图"]
+    B --> C["ReactAgent.execute_stream"]
+    C --> D{"历史消息超过 12 条？"}
+    D -->|是| E["LLM 摘要压缩旧消息"]
+    D -->|否| F["LangGraph 进入 ReAct 循环"]
+    E --> F
+    F --> G["before_model 中间件<br/>日志 / Token 统计 / 提示词切换"]
+    G --> H["模型推理：决定调用工具或直接回答"]
+    H --> I{"需要调用工具？"}
+    I -->|是| J["wrap_tool_call 中间件 + 工具执行"]
+    J --> K["RAG 检索 / 天气 / 用户数据等工具"]
+    K --> G
+    I -->|否| L["流式产出最终回答"]
+    L --> M["app.py 逐字符打字机渲染"]
+    M --> N["写入会话历史并刷新页面"]
+```
+
+完整链路见 [项目复盘](./项目复盘.md) 第四章「从启动到运行：一次完整请求的生命周期」。
+
 ## 项目结构
 
 ```text
@@ -260,3 +289,9 @@ def _maybe_compress(messages: list[dict]) -> list[dict]:
 - [项目复盘](./项目复盘.md) - 完整项目复盘
 - [项目面试预测](./项目面试预测.md) - 面试问答预测与回答指南
 - [项目运行](./项目运行.txt) - 部署与运行参考
+
+## 致谢与参考
+
+本项目在学习【黑马程序员】《大模型RAG与Agent智能体项目实战教程，基于主流的LangChain技术从大模型提示词到实战项目》后整理实现，作为学习练习项目。感谢黑马程序员提供的优质课程。
+
+视频链接：[【黑马程序员大模型RAG与Agent智能体项目实战教程】](https://www.bilibili.com/video/BV1yjz5BLEoY?vd_source=e75d4bd4c7aa7b9e61694ea13cda1272)
