@@ -1,0 +1,14 @@
+# 提示词文件路径配置
+# 项目共使用三套提示词，分别服务于不同场景
+
+# 系统提示词：定义 AI 的人设、行为规则和工具使用说明
+# 用于日常对话场景（产品问答、天气查询等）
+main_prompt_path: prompts/main_prompt.txt
+
+# RAG 总结提示词：指导 AI 结合检索到的知识库资料生成回答
+# 用于用户提问涉及产品知识时的 RAG 检索增强生成
+rag_summarize_prompt_path: prompts/rag_summarize.txt
+
+# 报告生成提示词：指导 AI 以专业报告写手的角色生成使用报告
+# 用于用户请求"生成报告"时的报告模式
+report_prompt_path: prompts/report_prompt.txt

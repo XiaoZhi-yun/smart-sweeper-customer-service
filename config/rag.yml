@@ -1,0 +1,11 @@
+# 阿里百炼模型配置
+# 本项目使用阿里通义大模型，所有模型均通过 DashScope 平台调用
+# API Key 通过环境变量 DASHSCOPE_API_KEY 传入
+
+# 对话生成模型：用于 Agent 推理、对话生成等需要输出自然语言的场景
+# 可选值：qwen3-max（当前）、qwen-plus、qwen-turbo 等
+chat_model_name: qwen3-max
+
+# 文本嵌入模型：用于把文本转换为向量，供向量数据库存储和检索
+# 可选值：text-embedding-v4（当前）、text-embedding-v2 等
+embedding_model_name: text-embedding-v4

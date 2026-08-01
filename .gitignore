@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+build/
+dist/
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Secrets and local config
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Runtime logs
+logs/
+*.log
+
+# Local Chroma vector store, rebuilt on first startup
+chroma_db/
+**/chroma_db/
+
+# Local MD5 dedup record, rebuilt on first startup
+md5.text

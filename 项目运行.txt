@@ -1,0 +1,49 @@
+# 1. 克隆/复制项目代码到新电脑
+
+# 2. 创建虚拟环境（Python >= 3.10）
+在pycharm或vscode终端执行：python -m venv .venv
+
+# 3. 激活虚拟环境
+.venv\Scripts\activate.bat
+
+# 4. 安装所有依赖
+pip install -r requirements.txt
+
+# 5. 配置阿里云 DashScope API Key
+#    需要在阿里云控制台开通「百炼」服务获取 API Key，
+#    地址：https://bailian.console.aliyun.com/cn-beijing?spm=a2ty02.46012040.0.0.26d074a11bXQFV&tab=model#/model-market
+#    开启免费额度用完即停，以防发生欠费
+#    方式一：设置环境变量（推荐，更安全）
+#    打开电脑设置搜索环境变量，新建用户变量，变量名DASHSCOPE_API_KEY，变量值为你的APIKey，重启电脑生效
+
+#    方式二：显式写入配置文件（迁移方便）
+#    若使用方式一配置API Key，则不用修改以下代码
+#      (a) 打开 config/rag.yml，添加一行：api_key: 你的API密钥
+#      用你复制过来的API Key替换掉"你的API密钥"
+#      (b) 打开 model/factory.py，将两处模型创建代码修改为显式传入 api_key：
+#         - 第38行  ChatTongyi(model=rag_conf["chat_model_name"], api_key=rag_conf["api_key"])
+#         - 第51行  DashScopeEmbeddings(model=rag_conf["embedding_model_name"], api_key=rag_conf["api_key"])
+#      (c) 注意：配置文件方式需将 config/rag.yml 加入 .gitignore 防止项目文件提交到互联网时密钥泄露，如若不动密钥安全泄露问题，建议使用方式一配置API Key
+
+# 6. 启动项目
+    在pycharm中：
+    (a)运行app.py
+    (b)win+R输入cmd回车打开命令提示符：
+        先切换到项目主目录
+        比如我的是在D:\PycharmProjects\AgentProject
+
+        D:
+        cd D:\PycharmProjects\AgentProject
+        .venv\Scripts\activate.bat
+        streamlit run app.py
+    在vscode中：
+    (a)终端中输入python app.py
+    (b)streamlit run app.py
+
+注意事项
+API Key：项目使用阿里通义大模型（qwen3-max）和嵌入模型（text-embedding-v4），需要在 阿里云百炼平台 申请 API Key，
+当然换成其他合适的模型也可以接入，但是需要查阅资料修改一些对应的配置
+
+数据目录：data/、config/、prompts/ 目录需完整复制，否则向量库和提示词会缺失
+首次启动：首次加载时会将 data/ 下的文档（.txt）入库到 Chroma 向量库，耗时取决于文档数量
+端口：Streamlit 默认使用 8501 端口，浏览器访问 http://localhost:8501

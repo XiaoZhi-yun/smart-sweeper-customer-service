@@ -1,0 +1,6 @@
+# Agent 外部数据配置
+# 存储用户的实际使用数据，用于生成个性化报告
+
+# 用户使用记录 CSV 文件路径
+# 数据格式：用户ID → 月份 → 使用指标（户型、面积、效率等）
+external_data_path: data/external/records.csv
