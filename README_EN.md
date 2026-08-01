@@ -56,32 +56,171 @@ graph TD
 
 ## Screenshots
 
-| Chat | Weather & Cleaning Tips | Usage Report |
-| --- | --- | --- |
-| ![Chat](assets/screenshot-1.png) | ![Weather & Cleaning Tips](assets/screenshot-2.png) | ![Usage Report](assets/screenshot-3.png) |
+The screenshots below correspond to the three use cases in Chapter 6 of [Project Retrospective](./项目复盘.md), with the complete execution flow of each case shown under its screenshot.
 
-### Request Lifecycle
+### Case 1: Basic Q&A - "How do I clean hair from the robot vacuum?"
 
-```mermaid
-graph TD
-    A["User enters a question in the browser"] --> B["app.py builds messages and checks report intent"]
-    B --> C["ReactAgent.execute_stream"]
-    C --> D{"More than 12 history messages?"}
-    D -->|Yes| E["LLM summarizes old messages"]
-    D -->|No| F["LangGraph enters the ReAct loop"]
-    E --> F
-    F --> G["before_model middleware<br/>logging / token stats / prompt switch"]
-    G --> H["Model reasons: call a tool or answer directly"]
-    H --> I{"Tool call needed?"}
-    I -->|Yes| J["wrap_tool_call middleware + tool execution"]
-    J --> K["RAG retrieval / weather / user data tools"]
-    K --> G
-    I -->|No| L["Stream final answer"]
-    L --> M["app.py renders typewriter output"]
-    M --> N["Save to session history and refresh"]
+![Case 1: Basic Q&A](assets/screenshot-1.png)
+
+**Complete execution flow**
+
+```text
+Step 1: User inputs "How do I clean hair from the robot vacuum?"
+        │
+        ▼
+Step 2: app.py detection
+        • is_report = False (no report keyword)
+        • Build history messages + current query
+        • Call agent.execute_stream(query, history, is_report=False)
+        │
+        ▼
+Step 3: ReactAgent builds messages
+        • messages = [history..., {role:"user", content:"How do I clean hair from the robot vacuum?"}]
+        • _maybe_compress: message count <= 12, no compression
+        • context_data = {"report": False}
+        │
+        ▼
+Step 4: ReAct loop (first round)
+        │
+        ├── 4a. before_model middleware
+        │   • log_before_model: "About to call the model with N messages"
+        │   • report_prompt_switch: context["report"]=False
+        │   → Return main_prompt.txt (system prompt)
+        │
+        ├── 4b. Model reasoning
+        │   • Thinking: "The user asks about hair cleaning, this is domain knowledge"
+        │   • Decision: call rag_summarize(query="methods to clean robot vacuum hair")
+        │
+        ├── 4c. wrap_tool_call middleware
+        │   • monitor_tool: "Execute tool: rag_summarize"
+        │   • Execute rag_summarize
+        │
+        ├── 4d. RAG service execution
+        │   ├── retriever_docs(query)
+        │   │   → Chroma vector retrieval
+        │   │   → 3 relevant documents found
+        │   ├── Build context string
+        │   │   "[Reference 1]: Content: hair cleaning 92%..."
+        │   │   "[Reference 2]: Content: brush replacement advice..."
+        │   │   "[Reference 3]: Content: dust bin cleaning frequency..."
+        │   └── chain.invoke({input, context})
+        │       → Model generates a summarized answer
+        │
+        ├── 4e. Second model reasoning
+        │   • Thinking: "Enough information is available, answer directly"
+        │   • Decision: generate final answer (no more tool calls)
+        │
+        └── 4f. Streaming output
+            yield "According to the references, hair cleaning methods include:\n"
+            yield "1. Use a rubber roller brush, hair is less likely to tangle\n"
+            yield "2. Clean the dust bin regularly, every 3 days is recommended\n"
+            yield "3. For short-pile carpet, enable carpet boost mode\n"
+        │
+        ▼
+Step 5: app.py receives streaming output
+        • capture function yields character by character
+        • write_stream renders the typewriter effect
+        • Concatenate the full answer into history
 ```
 
-The full flow is described in [Project Retrospective](./项目复盘.md), Chapter 4, "The Complete Lifecycle of a Request".
+### Case 2: Environmental Q&A - "What is the weather in Shenzhen today? Is it suitable for cleaning?"
+
+![Case 2: Environmental Q&A](assets/screenshot-2.png)
+
+**Complete execution flow**
+
+```text
+Step 1: User input → is_report = False
+        │
+        ▼
+Step 2: ReAct loop (first round)
+        • Model reasoning: "The user asks about weather, need to know the user's location"
+        • Decision: call get_user_location()
+        │
+        ▼
+Step 3: Execute get_user_location()
+        • Randomly returns: "Shenzhen"
+        │
+        ▼
+Step 4: ReAct loop (second round)
+        • Model reasoning: "The user is in Shenzhen, query Shenzhen weather"
+        • Decision: call get_weather(city="Shenzhen")
+        │
+        ▼
+Step 5: Execute get_weather(city="Shenzhen")
+        • Returns: "Shenzhen weather is sunny, 26°C, air humidity 50%..."
+        │
+        ▼
+Step 6: ReAct loop (third round)
+        • Model reasoning: "Sunny, comfortable temperature, moderate humidity, very suitable for cleaning"
+        • Decision: answer directly
+        │
+        ▼
+Step 7: Generate answer
+        "Shenzhen is sunny today, 26°C, humidity 50%, very suitable for robot vacuum cleaning."
+```
+
+### Case 3: Report Generation - "Generate my usage report"
+
+![Case 3: Report Generation](assets/screenshot-3.png)
+
+**Complete execution flow**
+
+```text
+Step 1: User inputs "Generate my usage report"
+        │
+        ▼
+Step 2: app.py preprocessing
+        • Keyword detection: "generate", "my", "report" match REPORT_KEYWORDS
+        • is_report = True
+        │
+        ▼
+Step 3: ReactAgent assembly
+        • context_data = {"report": True}
+        │
+        ▼
+Step 4: report_prompt_switch middleware (first-level detection)
+        • Read context["report"] = True
+        • Return report_prompt.txt (report-specific prompt)
+        • Model starts thinking as a "report writer"
+        │
+        ▼
+Step 5: Model reasoning (report mode)
+        • Thinking: "To generate a report, need user ID, month, usage records"
+        • Follow the constrained report generation flow:
+          ① Call fill_context_for_report()  ← required sentinel tool
+          ② Call get_user_id()
+          ③ Call get_current_month()
+          ④ Call fetch_external_data(user_id, month)
+        │
+        ▼
+Step 6: Tool call chain execution
+        │
+        ├── 6a. fill_context_for_report()
+        │   • Returns: "Switched to report generation mode"
+        │   • monitor_tool detects this call
+        │   • Sets context["report"] = True (double safety)
+        │
+        ├── 6b. get_user_id()
+        │   • Randomly returns: "1001"
+        │
+        ├── 6c. get_current_month()
+        │   • Returns the current year-month, e.g. "2026-08"
+        │
+        ├── 6d. fetch_external_data(user_id="1001", month="2026-08")
+        │   • _load_external_data() lazy loads the CSV (first call)
+        │   • Look up external_data["1001"]["2026-08"]
+        │   • Returns: "Feature: 65㎡ apartment | single | wood floor, efficiency: coverage: 85%..."
+        │
+        ▼
+Step 7: Model generates the report
+        • Uses the report_prompt.txt template
+        • Title: Heima Programmer robot vacuum usage report and maintenance advice
+        • Content: professional Markdown report
+        │
+        ▼
+Step 8: Stream output to the frontend
+```
 
 ## Project Structure
 

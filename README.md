@@ -56,32 +56,171 @@ graph TD
 
 ## 界面展示
 
-| 智能对话 | 天气与清洁建议 | 使用报告生成 |
-| --- | --- | --- |
-| ![智能对话](assets/screenshot-1.png) | ![天气与清洁建议](assets/screenshot-2.png) | ![使用报告生成](assets/screenshot-3.png) |
+以下截图分别对应 [项目复盘](./项目复盘.md) 第六章的三个功能案例，每张截图下方附上该案例的完整执行流程。
 
-### 请求执行流程
+### 案例 1：基础问答 - "扫地机器人怎么清理毛发？"
 
-```mermaid
-graph TD
-    A["用户在浏览器输入问题"] --> B["app.py 组装消息并检测报告意图"]
-    B --> C["ReactAgent.execute_stream"]
-    C --> D{"历史消息超过 12 条？"}
-    D -->|是| E["LLM 摘要压缩旧消息"]
-    D -->|否| F["LangGraph 进入 ReAct 循环"]
-    E --> F
-    F --> G["before_model 中间件<br/>日志 / Token 统计 / 提示词切换"]
-    G --> H["模型推理：决定调用工具或直接回答"]
-    H --> I{"需要调用工具？"}
-    I -->|是| J["wrap_tool_call 中间件 + 工具执行"]
-    J --> K["RAG 检索 / 天气 / 用户数据等工具"]
-    K --> G
-    I -->|否| L["流式产出最终回答"]
-    L --> M["app.py 逐字符打字机渲染"]
-    M --> N["写入会话历史并刷新页面"]
+![案例 1：基础问答](assets/screenshot-1.png)
+
+**完整执行流程**
+
+```text
+Step 1: 用户输入 "扫地机器人怎么清理毛发？"
+        │
+        ▼
+Step 2: app.py 检测
+        • is_report = False（无报告关键词）
+        • 构建历史消息 + 当前 query
+        • 调用 agent.execute_stream(query, history, is_report=False)
+        │
+        ▼
+Step 3: ReactAgent 组装消息
+        • messages = [历史..., {role:"user", content:"扫地机器人怎么清理毛发？"}]
+        • _maybe_compress: 消息数 <= 12，不压缩
+        • context_data = {"report": False}
+        │
+        ▼
+Step 4: ReAct 循环（第一次）
+        │
+        ├── 4a. before_model 中间件
+        │   • log_before_model: "即将调用模型，带 N 条消息"
+        │   • report_prompt_switch: context["report"]=False
+        │   → 返回 main_prompt.txt（系统提示词）
+        │
+        ├── 4b. 模型推理
+        │   • 思考："用户问清理毛发，这是专业知识"
+        │   • 决策：调用 rag_summarize(query="扫地机器人清理毛发方法")
+        │
+        ├── 4c. wrap_tool_call 中间件
+        │   • monitor_tool: "执行工具：rag_summarize"
+        │   • 执行 rag_summarize
+        │
+        ├── 4d. RAG 服务执行
+        │   ├── retriever_docs(query)
+        │   │   → Chroma 向量检索
+        │   │   → 找到 3 条相关文档
+        │   ├── 拼装 context 字符串
+        │   │   "【参考资料1】: 内容：毛发清理92%..."
+        │   │   "【参考资料2】: 内容：胶刷更换建议..."
+        │   │   "【参考资料3】: 内容：尘盒清理频率..."
+        │   └── chain.invoke({input, context})
+        │       → 模型生成总结回答
+        │
+        ├── 4e. 模型第二次推理
+        │   • 思考："已得到足够信息，可以直接回答"
+        │   • 决策：生成最终回答（不再调工具）
+        │
+        └── 4f. 流式产出
+            yield "根据参考资料，清理毛发的方法包括：\n"
+            yield "1. 使用胶刷主刷，毛发不易缠绕\n"
+            yield "2. 定期清理尘盒，建议每 3 天一次\n"
+            yield "3. 短毛地毯建议开启地毯增压模式\n"
+        │
+        ▼
+Step 5: app.py 接收流式输出
+        • capture 函数逐字符 yield
+        • write_stream 渲染打字机效果
+        • 拼接完整回答存入历史
 ```
 
-完整链路见 [项目复盘](./项目复盘.md) 第四章「从启动到运行：一次完整请求的生命周期」。
+### 案例 2：环境问答 - "深圳今天天气怎么样？适合扫地吗？"
+
+![案例 2：环境问答](assets/screenshot-2.png)
+
+**完整执行流程**
+
+```text
+Step 1: 用户输入 → is_report = False
+        │
+        ▼
+Step 2: ReAct 循环（第一次）
+        • 模型推理："用户问天气，需要知道用户位置"
+        • 决策：调用 get_user_location()
+        │
+        ▼
+Step 3: 执行 get_user_location()
+        • 随机返回："深圳"
+        │
+        ▼
+Step 4: ReAct 循环（第二次）
+        • 模型推理："知道用户在深圳了，查询深圳天气"
+        • 决策：调用 get_weather(city="深圳")
+        │
+        ▼
+Step 5: 执行 get_weather(city="深圳")
+        • 返回："城市深圳天气为晴天，气温26摄氏度，空气湿度50%..."
+        │
+        ▼
+Step 6: ReAct 循环（第三次）
+        • 模型推理："天气晴朗，温度适宜，湿度适中，非常适合扫地"
+        • 决策：直接回答
+        │
+        ▼
+Step 7: 生成回答
+        "深圳今天晴天，气温26°C，湿度50%，非常适合使用扫地机器人进行清扫。"
+```
+
+### 案例 3：报告生成 - "生成我的使用报告"
+
+![案例 3：报告生成](assets/screenshot-3.png)
+
+**完整执行流程**
+
+```text
+Step 1: 用户输入 "生成我的使用报告"
+        │
+        ▼
+Step 2: app.py 预处理
+        • 关键词检测："生成"、"我的"、"报告" 命中 REPORT_KEYWORDS
+        • is_report = True
+        │
+        ▼
+Step 3: ReactAgent 组装
+        • context_data = {"report": True}
+        │
+        ▼
+Step 4: report_prompt_switch 中间件（一级检测）
+        • 读取 context["report"] = True
+        • 返回 report_prompt.txt（报告专用提示词）
+        • 模型以"报告写手"角色开始思考
+        │
+        ▼
+Step 5: 模型推理（报告模式）
+        • 思考："要生成报告，需要用户ID、月份、使用记录"
+        • 按报告生成强约束流程：
+          ① 调用 fill_context_for_report()  ← 必调哨兵工具
+          ② 调用 get_user_id()
+          ③ 调用 get_current_month()
+          ④ 调用 fetch_external_data(user_id, month)
+        │
+        ▼
+Step 6: 工具调用链执行
+        │
+        ├── 6a. fill_context_for_report()
+        │   • 返回："已切换至报告生成模式"
+        │   • monitor_tool 检测到这个调用
+        │   • 设置 context["report"] = True（双保险）
+        │
+        ├── 6b. get_user_id()
+        │   • 随机返回："1001"
+        │
+        ├── 6c. get_current_month()
+        │   • 返回系统当前年月，如 "2026-08"
+        │
+        ├── 6d. fetch_external_data(user_id="1001", month="2026-08")
+        │   • _load_external_data() 懒加载 CSV（首次调用时）
+        │   • 查找 external_data["1001"]["2026-08"]
+        │   • 返回："特征：65㎡公寓 | 单身 | 木地板，效率：覆盖率:85%..."
+        │
+        ▼
+Step 7: 模型生成报告
+        • 使用 report_prompt.txt 模板
+        • 标题：黑马程序员扫地机器人使用情况报告与保养建议
+        • 内容：Markdown 格式的专业报告
+        │
+        ▼
+Step 8: 流式输出到前端
+```
 
 ## 项目结构
 
